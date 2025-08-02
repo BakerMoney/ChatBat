@@ -8,12 +8,13 @@
 
 body{
   background-image: url("/bg2.png");
-  background-size: contain;
+  background-size:auto;
   display: flex;
   align-items: center;
   justify-content: center;
   height: 100vh;
   color: white;
+  overflow: hidden;
 }
 
 .container{
