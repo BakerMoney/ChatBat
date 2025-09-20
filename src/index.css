@@ -26,3 +26,10 @@ body{
   border: 2px solid #1f1616;
   display: flex;
 }
+
+.loading{
+  padding: 50px;
+  font-size: 35px;
+  border-radius: 10px;
+  background-color: #4a4343;
+}

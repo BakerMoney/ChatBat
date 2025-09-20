@@ -1,10 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import "./chat.css"
 import EmojiPicker from "emoji-picker-react";
+import { onSnapshot, doc, updateDoc, arrayUnion, getDoc} from "firebase/firestore";
+import { db } from "../../libraries/firebase";
+import { useChatStore } from "../../libraries/chatStore";
+import { useUserStore } from "../../libraries/userStore";
 
 const Chat = () => {
-const [open,setOpen] = useState(false)
-const [text,setText] = useState("")
+const [chat,setChat] = useState();
+const [open,setOpen] = useState(false);
+const [text,setText] = useState("");
+
+const {currentUser} = useUserStore();
+const {chatId, user} = useChatStore();
 
 const endRef = useRef(null)
 
@@ -12,10 +20,65 @@ useEffect(() => {
     endRef.current?.scrollIntoView({behaviour: "smooth"})
 }, [])
 
+useEffect(() => {
+    const unSub = onSnapshot(
+        doc(db, "chats", chatId), (res) => {
+            setChat(res.data());
+        }
+    );
+
+    return () => {
+        unSub();
+    };
+}, [chatId]);
+
+console.log(chat)
+
 const handleEmoji = (e) => {
     setText((prev) => prev + e.emoji);
     setOpen(false)
 };
+
+const handleSend = async () => {
+    if (text === "") return;
+
+    try{
+        await updateDoc(doc(db, "chats", chatId),{
+            messages:arrayUnion({
+                senderId: currentUser.id,
+                text,
+                createdAt: new Date(),
+            }),
+        });
+
+        const userIDs = [currentUser.id, user.id]
+
+        userIDs.forEach(async (id)=>{
+
+        
+            const userChatsRef = doc(db, "userchats", id)
+            const userChatSnapshot = await getDoc(userChatsRef)
+
+            if(userChatSnapshot.exists()){
+                const userChatsData = userChatSnapshot.data()
+
+                const chatIndex = userChatsData.chats.findIndex(c=> c.chatId === chatId)
+
+                userChatsData.chats[chatIndex].lastMessage = text;
+                userChatsData.chats[chatIndex].isSeen = id === currentUser.id ? true : false;
+                userChatsData.chats[chatIndex].updatedAt = Date.now();
+
+                await updateDoc(userChatsRef, {
+                    chats: userChatsData.chats,
+                });
+            }
+        })
+    }
+    catch(err){
+        console.log(err)
+    }
+};
+
     return(
         <div className="chat">
             <div className="top">
@@ -33,87 +96,20 @@ const handleEmoji = (e) => {
                 </div>
             </div>
             <div className="center">
-                <div className="message">
-                    <img src="./avatar.png" alt="" />
-                    <div className="texts">
-                        <p>
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                        </p>
-                        <span>1 min ago</span>
+                {chat?.messages?.map((message) => (
+                    <div className="messageown" key={message?.createdAt}>
+                        <img src="./avatar.png" alt="" />
+                        <div className="texts">
+                            {message.img && <img
+                                src={message.img}
+                                alt=""
+                            />}
+                            <p>
+                                {message.text} 
+                            </p>
+                        </div>
                     </div>
-                    <div className="data">
-
-                    </div>
-                </div>
-                <div className="messageown">
-                    <img src="./info.png" alt="" />
-                    <div className="texts">
-                        <p>
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                        </p>
-                        <span>1 min ago</span>
-                    </div>
-                    <div className="data">
-
-                    </div>
-                </div>
-                <div className="message">
-                    <img src="./avatar.png" alt="" />
-                    <div className="texts">
-                        <p>
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                        </p>
-                        <span>1 min ago</span>
-                    </div>
-                    <div className="data">
-
-                    </div>
-                </div>
-                <div className="messageown">
-                    <img src="./info.png" alt="" />
-                    <div className="texts">
-                        <p>
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                        </p>
-                        <span>1 min ago</span>
-                    </div>
-                    <div className="data">
-
-                    </div>
-                </div>
-                <div className="message">
-                    <img src="./avatar.png" alt="" />
-                    <div className="texts">
-                        <img src="https://images.steamusercontent.com/ugc/105104550292938732/3FE3F8BA895A13279F409C5C002EC73E2C254C5F/?imw=5000&imh=5000&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=false" alt="" />
-                        <p>
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                            lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum
-                        </p>
-                        <span>1 min ago</span>
-                    </div>
-                    <div className="data">
-
-                    </div>
-                </div>
+                ))}
                 <div ref={endRef}></div>
             </div>
             <div className="bottom">
@@ -130,7 +126,7 @@ const handleEmoji = (e) => {
                     </div>
 
                 </div>
-                <button className="sendButton">Send</button>
+                <button className="sendButton" onClick={handleSend}>Send</button>
             </div>
         </div>
     )
