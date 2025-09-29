@@ -1,45 +1,62 @@
-import { doc, getDoc } from 'firebase/firestore';
-import { create } from 'zustand'
-import { db } from './firebase';
-import { useUserStore } from './userStore';
+import { doc, onSnapshot } from "firebase/firestore";
+import { create } from "zustand";
+import { db } from "./firebase";
+import { useUserStore } from "./userStore";
 
-export const useChatStore = create((set) => ({
-    chatId: null,
-    user: null,
-    isUserBlocked: false,
-    isReceiverBlocked: false,
-    changeChat: (chatId, user) =>{
-        const currentUser = useUserStore.getState().currentUser
+export const useChatStore = create((set, get) => ({
+  chatId: null,
+  user: null,
+  isCurrentUserBlocked: false,
+  isReceiverBlocked: false,
 
-        if(user.blocked.includes(currentUser.id)) {
-            return set({
-                chatId,
-                user: null,
-                isUserBlocked: true,
-                isReceiverBlocked: false,
-            });
-        }
+  changeChat: (chatId, user) => {
+    const currentUser = useUserStore.getState().currentUser;
 
-        else if(currentUser.blocked.includes(user.id)) {
-            return set({
-                chatId,
-                user: user,
-                isUserBlocked: false,
-                isReceiverBlocked: true,
-            });
-        }
-
-        else {
-            return set({
-                chatId,
-                user,
-                isUserBlocked: false,
-                isReceiverBlocked: false,
-            });
-        }
-    },
-
-    changeBlock: ()=>{
-        set((state)=>({...state, isReceiverBlocked: !state.isReceiverBlocked }));
+    // initial check
+    if (user.blocked.includes(currentUser.id)) {
+      set({
+        chatId,
+        user,
+        isCurrentUserBlocked: true,
+        isReceiverBlocked: false,
+      });
+    } else if (currentUser.blocked.includes(user.id)) {
+      set({
+        chatId,
+        user,
+        isCurrentUserBlocked: false,
+        isReceiverBlocked: true,
+      });
+    } else {
+      set({
+        chatId,
+        user,
+        isCurrentUserBlocked: false,
+        isReceiverBlocked: false,
+      });
     }
+
+    // listen to currentUser's "blocked" field in real time
+    const unsub = onSnapshot(doc(db, "users", currentUser.id), (docSnap) => {
+      if (!docSnap.exists()) return;
+      const blocked = docSnap.data().blocked || [];
+      set({
+        isReceiverBlocked: user ? blocked.includes(user.id) : false,
+      });
+    });
+
+    // listen to other user's "blocked" field in real time
+    const unsub2 = onSnapshot(doc(db, "users", user.id), (docSnap) => {
+      if (!docSnap.exists()) return;
+      const blocked = docSnap.data().blocked || [];
+      set({
+        isCurrentUserBlocked: blocked.includes(currentUser.id),
+      });
+    });
+
+    return () => {
+      unsub();
+      unsub2();
+    };
+  },
 }));

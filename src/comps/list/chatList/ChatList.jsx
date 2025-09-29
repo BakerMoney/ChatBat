@@ -10,6 +10,7 @@ import { useChatStore } from "../../../libraries/chatStore";
 const ChatList = () => {
     const [chats, setChats] = useState([]);
     const [addMode, setAddMode] = useState(false);
+    const [input, SetInput] = useState("");
 
     const {currentUser} = useUserStore();
     const {chatId, changeChat} = useChatStore();
@@ -62,27 +63,29 @@ const ChatList = () => {
         }
     };
 
+    const filteredChats = chats.filter(c=> c.user.username.toLowerCase().includes(input.toLowerCase()))
+
     return(
         <div className="chatList">
             <div className="search">
                 <div className="searchBar">
                    <img src="./search.png" alt=""/>
-                   <input type="text" placeholder="Search user.." /> 
+                   <input type="text" placeholder="Search user.." onChange={(e)=>SetInput(e.target.value)}/> 
                 </div>
                 <img src={addMode ? "./minus.png" : "./plus.png"} alt="" className="add" 
                 onClick = {() => setAddMode(prev => !prev)}/>
                 
             </div>
-            {chats.map((chat) => (
+            {filteredChats.map((chat) => (
                 <div className="item" key={chat.chatId} onClick={()=>handleSelect(chat)} style={{
-                    backgroundColor: chat?.isSeen ? "transparent" : "blue"
+                    backgroundColor: chat?.isSeen ? "transparent" : "#5e89e792"
                 }}>
                     <img src={chat.user.avatar || "./avatar.png"} alt="" />
                     <div className="texts">
                         <span>{chat.user.username}</span>
                         <p>{chat.lastMessage}</p>
                     </div>
-            </div>
+                </div>
             ))}
 
             {addMode&&<AddUser/>}
